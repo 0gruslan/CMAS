@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git:*)",
+      "Bash(grep -r \"TODO\\\\|FIXME\\\\|XXX\\\\|HACK\" /Users/artakoganisan/Documents/CMAS --include=*.py --include=*.md)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(docker compose:*)",
+      "Bash(curl -s -X POST http://localhost:3000/api/requests -H \"Content-Type: application/json\" -d '{\"\"\"\"student_id\"\"\"\":4,\"\"\"\"room_id\"\"\"\":1,\"\"\"\"category\"\"\"\":\"\"\"\"Сантехника\"\"\"\",\"\"\"\"description\"\"\"\":\"\"\"\"тест описание\"\"\"\"}')",
+      "Bash(docker exec:*)",
+      "Bash(find /Users/artakoganisan/Documents/CMAS/requests_service -name *.pyc -delete)",
+      "Bash(find /Users/artakoganisan/Documents/CMAS/requests_service -name __pycache__ -type d -exec rm -rf {} +)"
     ]
   }
 }

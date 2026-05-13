@@ -45,10 +45,10 @@ class UserRole(str, Enum):
 
 
 class UserBase(BaseModel):
-    full_name: str = Field(..., min_length=2)
-    phone: str = Field(..., pattern=r"^\+?[0-9]{10,15}$")
+    full_name: str
+    phone: str
     birth_date: date
-    email: str = Field(..., pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    email: str
     role: UserRole = UserRole.student
 
 
@@ -186,9 +186,14 @@ async def login(payload: LoginIn, db: Session = Depends(get_db)) -> TokenOut:
 
 @app.get("/users", response_model=list[UserOut])
 async def list_users(
-    _: UserORM = Depends(get_current_user), db: Session = Depends(get_db)
+    room_id: int | None = None,
+    _: UserORM = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> list[UserOut]:
-    users = db.query(UserORM).order_by(UserORM.id.asc()).all()
+    q = db.query(UserORM)
+    if room_id is not None:
+        q = q.filter(UserORM.room_id == room_id)
+    users = q.order_by(UserORM.id.asc()).all()
     return [_to_user_out(user) for user in users]
 
 

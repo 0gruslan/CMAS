@@ -14,3 +14,6 @@ export const updateRequestStatus = (id, data) =>
 
 export const addComment = (id, data) =>
   client.post(`/requests/${id}/comments`, data).then((r) => r.data)
+
+export const deleteRequest = (id) =>
+  client.delete(`/requests/${id}`)

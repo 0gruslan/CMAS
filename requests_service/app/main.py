@@ -5,6 +5,7 @@ from enum import Enum
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -209,6 +210,14 @@ async def list_requests_by_room(
         .all()
     )
     return [_request_to_out(item) for item in items]
+
+
+@app.delete("/requests/{request_id}")
+async def delete_request(request_id: int, db: Session = Depends(get_db)):
+    request_item = _get_request_or_404(db, request_id)
+    db.delete(request_item)
+    db.commit()
+    return {"ok": True}
 
 
 @app.post("/requests/{request_id}/comments", response_model=MaintenanceRequestDetails)

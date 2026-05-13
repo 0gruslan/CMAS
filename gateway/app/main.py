@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.responses import Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -197,13 +198,16 @@ async def login(payload: LoginIn):
 
 @app.get("/users", summary="Список пользователей [commandant, admin]")
 async def list_users(
+    room_id: int | None = Query(default=None),
     auth: dict[str, Any] = Depends(get_current_user_payload),
 ):
     _require_staff(auth)
+    params = {"room_id": room_id} if room_id is not None else None
     return await _forward_request(
         "GET",
         USERS_SERVICE_URL,
         "/users",
+        params=params,
         headers=_auth_headers(auth["authorization"]),
     )
 
@@ -347,6 +351,15 @@ async def get_request(
     _: dict[str, Any] = Depends(get_current_user_payload),
 ):
     return await _forward_request("GET", REQUESTS_SERVICE_URL, f"/requests/{request_id}")
+
+
+@app.delete("/requests/{request_id}", summary="Удалить заявку [commandant, admin]")
+async def delete_request(
+    request_id: int,
+    auth: dict[str, Any] = Depends(get_current_user_payload),
+):
+    _require_staff(auth)
+    await _forward_request("DELETE", REQUESTS_SERVICE_URL, f"/requests/{request_id}")
 
 
 @app.post("/requests", summary="Создать заявку [все]")

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getRequests, createRequest } from '../api/requests'
+import { getRequests, createRequest, deleteRequest } from '../api/requests'
 import { useAuth } from '../context/AuthContext'
 import Layout from '../components/Layout'
 import StatusBadge from '../components/StatusBadge'
-import { Plus, X, ChevronRight, ClipboardList, AlertTriangle } from 'lucide-react'
+import { Plus, X, ChevronRight, ClipboardList, AlertTriangle, Trash2 } from 'lucide-react'
 
 const CATEGORIES = ['Сантехника', 'Электрика', 'Интернет', 'Мебель', 'Уборка', 'Другое']
 const CAT_COLOR = { 'Сантехника': '#3b82f6', 'Электрика': '#f59e0b', 'Интернет': '#8b5cf6', 'Мебель': '#10b981', 'Уборка': '#06b6d4', 'Другое': '#94a3b8' }
@@ -19,6 +19,7 @@ export default function RequestsPage() {
   const [form, setForm] = useState({ category: CATEGORIES[0], description: '', room_id: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(null) // { id, category }
 
   // Для студента комната берётся из профиля автоматически
   const studentRoomId = !isStaff ? user?.room_id : null
@@ -57,6 +58,15 @@ export default function RequestsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return
+    try {
+      await deleteRequest(confirmDelete.id)
+      setConfirmDelete(null)
+      load()
+    } catch { /* ignore */ }
   }
 
   return (
@@ -99,7 +109,7 @@ export default function RequestsPage() {
                 <thead><tr>
                   <th>#</th><th>Категория</th><th>Описание</th>
                   {isStaff && <th>Студент</th>}
-                  <th>Статус</th><th>Дата</th><th style={{ width: 36 }}></th>
+                  <th>Статус</th><th>Дата</th><th style={{ width: isStaff ? 64 : 36 }}></th>
                 </tr></thead>
                 <tbody>
                   {requests.map(req => (
@@ -120,12 +130,22 @@ export default function RequestsPage() {
                         {new Date(req.created_at).toLocaleDateString('ru-RU')}
                       </td>
                       <td>
-                        <Link to={`/requests/${req.id}`}
-                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, color: '#cbd5e1', textDecoration: 'none' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = '#eef2ff'; e.currentTarget.style.color = '#6366f1' }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#cbd5e1' }}>
-                          <ChevronRight size={14} />
-                        </Link>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {isStaff && (
+                            <button onClick={() => setConfirmDelete({ id: req.id, category: req.category })}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, color: '#fca5a5', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.color = '#ef4444' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#fca5a5' }}>
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                          <Link to={`/requests/${req.id}`}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, color: '#cbd5e1', textDecoration: 'none' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#eef2ff'; e.currentTarget.style.color = '#6366f1' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#cbd5e1' }}>
+                            <ChevronRight size={14} />
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -133,6 +153,32 @@ export default function RequestsPage() {
               </table>
             )}
       </div>
+
+      {confirmDelete && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setConfirmDelete(null)}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 340, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Trash2 size={16} style={{ color: '#ef4444' }} />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#1e293b' }}>Удалить заявку</div>
+            </div>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 20, lineHeight: 1.5 }}>
+              Вы уверены, что хотите удалить заявку <strong style={{ color: '#1e293b' }}>#{confirmDelete.id} · {confirmDelete.category}</strong>? Это действие нельзя отменить.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirmDelete(null)} className="btn" style={{ flex: 1, background: '#f1f5f9', color: '#475569' }}>
+                Отмена
+              </button>
+              <button onClick={handleDelete} className="btn btn-danger" style={{ flex: 1 }}>
+                <Trash2 size={13} />Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(4px)' }}>

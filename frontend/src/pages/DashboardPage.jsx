@@ -12,6 +12,7 @@ export default function DashboardPage() {
   const { user, isStaff, updateUser } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -33,12 +34,26 @@ export default function DashboardPage() {
             updateUser({ ...user, room_id: profile.user.room_id })
           }
         }
+      } catch (err) {
+        const status = err?.response?.status
+        if (status === 401) setLoadError('Сессия истекла. Пожалуйста, войдите снова.')
+        else setLoadError('Не удалось загрузить данные. Проверьте соединение.')
       } finally { setLoading(false) }
     }
     load()
-  }, [])
+  }, [loading])
 
   if (loading) return <Layout><div className="spinner-wrap"><div className="spinner" /></div></Layout>
+  if (loadError || !data) return (
+    <Layout>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 12 }}>
+        <p style={{ color: '#ef4444', fontSize: 14 }}>{loadError || 'Ошибка загрузки'}</p>
+        <button className="btn btn-primary btn-sm" onClick={() => { setLoadError(''); setLoading(true); }}>
+          Попробовать снова
+        </button>
+      </div>
+    </Layout>
+  )
 
   return (
     <Layout>
