@@ -7,6 +7,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 
 def get_database_url() -> str:
+    url = os.getenv("DATABASE_URL")
+    if url:
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
     host = os.getenv("ROOMS_DB_HOST", "localhost")
     port = os.getenv("ROOMS_DB_PORT", "5432")
     name = os.getenv("ROOMS_DB_NAME", "rooms_db")
