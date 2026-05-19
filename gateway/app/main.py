@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI(
     title="API Gateway",
@@ -26,6 +27,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+Instrumentator().instrument(app).expose(app)
 
 USERS_SERVICE_URL = os.getenv("USERS_SERVICE_URL", "http://users_service:8001")
 ROOMS_SERVICE_URL = os.getenv("ROOMS_SERVICE_URL", "http://rooms_service:8002")
