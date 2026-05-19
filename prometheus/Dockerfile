@@ -1,6 +1,6 @@
 FROM prom/prometheus:latest
 
-COPY prometheus.yml /etc/prometheus/prometheus.yml.template
+COPY prometheus/prometheus.yml /etc/prometheus/prometheus.yml.template
 
 RUN apk add --no-cache gettext
 
