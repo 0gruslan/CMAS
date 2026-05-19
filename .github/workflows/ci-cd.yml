@@ -28,3 +28,28 @@ jobs:
             --show-source \
             --statistics \
             --exclude=venv,alembic,.git
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Test users_service
+        working-directory: users_service
+        run: python -m pytest tests/ -v
+
+      - name: Test rooms_service
+        working-directory: rooms_service
+        run: python -m pytest tests/ -v
+
+      - name: Test requests_service
+        working-directory: requests_service
+        run: python -m pytest tests/ -v
