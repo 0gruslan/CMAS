@@ -1,11 +1,16 @@
-FROM alpine:3.19 AS envsubst
-RUN apk add --no-cache gettext
-COPY prometheus/prometheus.yml /tmp/prometheus.yml.template
+FROM alpine:3.19
 
-FROM prom/prometheus:latest
-COPY --from=envsubst /usr/bin/envsubst /usr/bin/envsubst
-COPY --from=envsubst /tmp/prometheus.yml.template /etc/prometheus/prometheus.yml.template
+RUN apk add --no-cache gettext wget tar
+
+RUN wget -qO /tmp/prometheus.tar.gz \
+    https://github.com/prometheus/prometheus/releases/download/v2.51.0/prometheus-2.51.0.linux-amd64.tar.gz && \
+    tar -xzf /tmp/prometheus.tar.gz -C /tmp && \
+    mv /tmp/prometheus-2.51.0.linux-amd64/prometheus /usr/local/bin/ && \
+    mv /tmp/prometheus-2.51.0.linux-amd64/promtool /usr/local/bin/ && \
+    rm -rf /tmp/prometheus*
+
+COPY prometheus/prometheus.yml /etc/prometheus/prometheus.yml.template
 
 EXPOSE 9090
 
-ENTRYPOINT ["sh", "-c", "envsubst < /etc/prometheus/prometheus.yml.template > /etc/prometheus/prometheus.yml && prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"]
+CMD ["sh", "-c", "envsubst < /etc/prometheus/prometheus.yml.template > /etc/prometheus/prometheus.yml && prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"]
