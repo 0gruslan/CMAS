@@ -13,4 +13,4 @@ COPY users_service/ .
 EXPOSE 8001
 
 # Команда запуска (переопределяется в docker-compose)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8001"]
