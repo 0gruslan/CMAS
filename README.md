@@ -1,111 +1,116 @@
+# CMAS — система управления общежитием
+
+Микросервисное веб-приложение для учёта проживания, пользователей и заявок на обслуживание.
+
+**Репозиторий:** https://github.com/0gruslan/CMAS
+
 ## 👥 Команда проекта
+
 - Оганисян Артак
 - Кривощеков Дмитрий
 - Гунба Руслан
 
-## 🧱 Общая архитектура
+---
+
+## 🧱 Архитектура
+
 ```
-[Клиент] (Web/Моб. приложение)
-    │
-    ▼
-[API Gateway] (FastAPI — единая точка входа)
-    │
-    ├── ► Микросервис 1: Пользователи и роли
-    ├── ► Микросервис 2: Комнаты и проживание
-    └── ► Микросервис 3: Заявки и обслуживание
+[Клиент — React :3000]
+        │  /api/*
+        ▼
+[API Gateway — FastAPI :8000]  JWT, маршрутизация, агрегация
+        │
+        ├──► Users Service    :8001  →  PostgreSQL users_db    :5433
+        ├──► Rooms Service    :8002  →  PostgreSQL rooms_db    :5434
+        └──► Requests Service :8003  →  PostgreSQL requests_db :5435
+
+[Prometheus :9090]  [Loki :3100]  [Grafana :3003]
 ```
-Протокол: REST/gRPC  
-База данных: отдельная БД на микросервис (PostgreSQL)  
-Аутентификация: JWT (сквозной токен через Gateway)
+
+- **Протокол:** REST (HTTP)
+- **БД:** отдельная PostgreSQL на микросервис, без прямых связей между базами
+- **Аутентификация:** JWT через Gateway
+- **Связь сервисов:** только через API Gateway и общие ID (`student_id`, `room_id`)
 
 ---
 
-## 🧩 1. Микросервис «Пользователи и роли» (Auth & Users)
+## 🚀 Быстрый старт
 
-Ответственность:
-- Регистрация, вход, JWT-токены
-- Роли: студент, комендант, администратор
-- Профили пользователей (ФИО, группа, контакты)
-- Привязка к комнате (только хранение ID комнаты, без логики размещения)
+### 1. Настройка окружения
 
-Модели:
-- User (id, ФИО, email, пароль, роль, id_комнаты)
-- Role (студент/комендант/админ)
-
-API:
-- POST /register, /login
-- GET /users, /users/{id}
-- PUT /users/{id}/room — назначить комнату (вызывается из другого сервиса)
-
----
-
-## 🧩 2. Микросервис «Комнаты и проживание» (Rooms & Accommodation)
-
-Ответственность:
-- Этажи, комнаты, места
-- Статус комнаты (свободна, частично занята, ремонт)
-- Поселение/выселение
-- История проживания
-
-Модели:
-- Floor (номер, общежитие)
-- Room (номер, этаж, вместимость, свободно_мест)
-- Residence (id_студента, id_комнаты, дата_заезда, дата_выезда)
-
-API:
-- GET /rooms, /rooms/{id}
-- POST /rooms/assign — заселить
-- POST /rooms/evict — выселить
-- GET /floors/{id}/stats — загрузка этажа
-
----
-
-## 🧩 3. Микросервис «Заявки и обслуживание» (Requests & Maintenance)
-
-Ответственность:
-- Заявки от студентов (сломалась мебель, нет воды и т.п.)
-- Назначение ответственного (комендант, техслужба)
-- Статусы: создана, в работе, выполнена
-- Уведомления
-
-Модели:
-- Request (id, id_студента, id_комнаты, категория, описание, статус, дата)
-- Comment (к заявке)
-
-API:
-- GET /requests, /requests/{id}
-- POST /requests — создать заявку
-- PUT /requests/{id}/status — изменить статус
-- GET /requests/room/{room_id} — заявки по комнате
-
----
-
-## 🌉 API Gateway (общий вход)
-
-Задачи:
-- Маршрутизация запросов к микросервисам
-- Проверка JWT (кроме `/login`, `/register`, `/health`, `/`)
-- Агрегация данных (например: профиль студента + его комната + его заявки)
-
-Основные эндпоинты Gateway:
-- `POST /register`, `POST /login`
-- `GET /users`, `GET /users/{id}`, `PUT /users/{id}/room`
-- `POST /floors`, `GET /rooms`, `POST /rooms`, `GET /rooms/{id}`
-- `POST /rooms/assign`, `POST /rooms/evict`, `GET /floors/{id}/stats`
-- `GET /requests`, `GET /requests/{id}`, `POST /requests`
-- `PUT /requests/{id}/status`, `GET /requests/room/{room_id}`
-- `POST /requests/{id}/comments`
-- `GET /profile/{id}` — агрегирует данные из users + rooms + requests
-
-Пример использования:
 ```bash
-# 1) Логин
+cp .env.example .env
+# при необходимости отредактируйте пароли и порты
+```
+
+### 2. Запуск
+
+```bash
+docker compose up --build
+```
+
+### 3. Адреса сервисов
+
+| Сервис | URL | Описание |
+|--------|-----|----------|
+| **Frontend** | http://localhost:3000 | Веб-интерфейс |
+| **API Gateway** | http://localhost:8000/docs | Swagger, единая точка входа |
+| Users Service | http://localhost:8001/docs | Пользователи, JWT |
+| Rooms Service | http://localhost:8002/docs | Комнаты, заселение |
+| Requests Service | http://localhost:8003/docs | Заявки на ремонт |
+| **Grafana** | http://localhost:3003 | Метрики и логи (`admin` / `admin`) |
+| Prometheus | http://localhost:9090 | Сбор метрик |
+| Loki | http://localhost:3100 | Хранилище логов |
+
+Миграции Alembic применяются при старте контейнеров (`alembic upgrade head`).
+
+---
+
+## 🧩 Микросервисы
+
+### 1. Пользователи и роли (Users)
+
+- Регистрация, вход, JWT
+- Роли: `student`, `commandant`, `admin`
+- Профиль, поле `room_id` (синхронизируется при заселении)
+
+**API:** `POST /register`, `POST /login`, `GET /users`, `GET /users/{id}`, `PUT /users/{id}/room`
+
+### 2. Комнаты и проживание (Rooms)
+
+- Этажи, комнаты, свободные места
+- Статусы: `free`, `partial`, `repair`
+- Заселение / выселение, история `residences`
+- Статистика этажа
+
+**API:** `POST /floors`, `POST /rooms`, `GET /rooms`, `GET /rooms/{id}`, `POST /rooms/assign`, `POST /rooms/evict`, `GET /floors/{id}/stats`
+
+### 3. Заявки и обслуживание (Requests)
+
+- Заявки студентов, статусы: `created` → `in_progress` → `done`
+- Комментарии к заявкам
+
+**API:** `GET /requests`, `POST /requests`, `GET /requests/{id}`, `PUT /requests/{id}/status`, `GET /requests/room/{room_id}`, `POST /requests/{id}/comments`
+
+---
+
+## 🌉 API Gateway
+
+- Маршрутизация ко всем микросервисам
+- Проверка JWT (кроме `/login`, `/register`, `/health`, `/`)
+- **Агрегация:** `GET /profile/{id}` — user + room + requests
+- **Оркестрация:** при `POST /rooms/assign` и `/rooms/evict` — Rooms, затем синхронизация Users
+
+Пример:
+
+```bash
+# Логин
 curl -X POST http://localhost:8000/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@cmas.local","password":"admin123"}'
 
-# 2) Использование токена
-curl http://localhost:8000/users \
+# Запрос с токеном
+curl http://localhost:8000/rooms \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
@@ -113,94 +118,108 @@ curl http://localhost:8000/users \
 
 ## 📦 Взаимодействие между сервисами
 
-1. Заселение студента:
-   - Gateway → `POST /rooms/assign` (Rooms Service)
-   - Gateway → `PUT /users/{id}/room` (Users Service, синхронизация room_id)
-   - (синхронно через HTTP/gRPC или асинхронно через RabbitMQ/Kafka)
+1. **Заселение:** Gateway → `POST /rooms/assign` (Rooms) → `PUT /users/{id}/room` (Users)
+2. **Выселение:** Gateway → `POST /rooms/evict` (Rooms) → `PUT /users/{id}/room` с `room_id: null`
+3. **Профиль:** Gateway → Users + Rooms (если есть комната) + Requests по `student_id`
+4. **Заявка:** Gateway → Requests; `student_id` и `room_id` хранятся как ID без FK в чужие БД
 
-2. Создание заявки:
-   - Gateway → Сервис 3 (создать заявку)
-   - Сервис 3 (опционально) → Уведомление коменданту
+Микросервисы **не вызывают друг друга напрямую** — только Gateway.
 
-3. Просмотр профиля:
-   - Gateway → `GET /users/{id}`
-   - Gateway → `GET /rooms/{room_id}` (если комната назначена)
-   - Gateway → `GET /requests?student_id={id}`
+---
+
+## 📊 Мониторинг
+
+Стек: **Prometheus** + **Grafana** + **Loki** + **Promtail**.
+
+### Метрики
+
+Каждый FastAPI-сервис отдаёт `/metrics` (библиотека `prometheus-fastapi-instrumentator`): RPS, latency, HTTP-статусы.
+
+На дашборде Grafana **«CMAS — метрики и логи»**:
+- нагрузка и ошибки 5xx по сервисам;
+- latency p50/p95;
+- графики по статусам HTTP.
+
+### Логи и correlation_id
+
+- Заголовок **`X-Correlation-ID`** в каждом ответе (можно передать в запросе).
+- Логи в JSON: `correlation_id`, `service`, `method`, `path`, `status_code`.
+- Gateway пробрасывает ID в downstream-сервисы.
+- В Grafana — фильтр по `correlation_id` для просмотра цепочки запросов.
+
+```bash
+curl -i http://localhost:8000/health
+# заголовок X-Correlation-ID в ответе
+```
+
+Переменные Grafana в `.env`: `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_PORT`.
 
 ---
 
 ## 🗄️ Базы данных
 
-- Сервис 1: своя БД — users, roles
-- Сервис 2: своя БД — rooms, floors, residence_history
-- Сервис 3: своя БД — requests, comments
-
-> Никаких прямых связей между БД, только через API сервисов.
-
----
-
-## 🔐 Безопасность и роли
-
-- Студент: видит только себя, свою комнату, свои заявки.
-- Комендант: видит этаж/общежитие, управляет заселением, обрабатывает заявки.
-- Админ: полный доступ, управление пользователями и ролями.
+| Сервис | Контейнер | Порт (хост) | Таблицы |
+|--------|-----------|-------------|---------|
+| Users | `users_db` | 5433 | users |
+| Rooms | `rooms_db` | 5434 | floors, rooms, residences |
+| Requests | `requests_db` | 5435 | maintenance_requests, request_comments |
 
 ---
 
-## 🚀 Запуск и миграции
+## 🔐 Роли
 
-Теперь сервисы работают только через PostgreSQL, без in-memory моков.
+| Роль | Доступ |
+|------|--------|
+| **student** | Свой профиль, своя комната, свои заявки |
+| **commandant** | Заселение, заявки, комнаты этажа |
+| **admin** | Полный доступ |
 
-Запуск через Docker Compose:
+---
+
+## 🧪 Тесты
 
 ```bash
-docker compose up --build
+pip install -r requirements.txt
+python -m pytest users_service/tests/ -v
+python -m pytest rooms_service/tests/ -v
+python -m pytest requests_service/tests/ -v
 ```
 
-Миграции Alembic для каждого сервиса применяются автоматически при старте контейнеров:
-- `users_service`: `alembic upgrade head`
-- `rooms_service`: `alembic upgrade head`
-- `requests_service`: `alembic upgrade head`
+Тесты используют SQLite in-memory и `TestClient` (без Docker).
 
-При необходимости можно запустить вручную:
+CI: GitHub Actions — lint (flake8) и pytest для всех трёх микросервисов (`.github/workflows/ci-cd.yml`).
+
+---
+
+## 📁 Структура репозитория
+
+```
+CMAS/
+├── gateway/              # API Gateway
+├── users_service/
+├── rooms_service/
+├── requests_service/
+├── frontend/             # React + Vite
+├── shared/cmas_shared/   # correlation_id, JSON-логирование
+├── prometheus/
+├── grafana/provisioning/ # дашборды и datasources
+├── loki/
+├── promtail/
+├── docker-compose.yml
+└── requirements.txt
+```
+
+---
+
+## 🛠 Полезные команды
 
 ```bash
-docker compose exec users_service alembic upgrade head
+# Миграции вручную
 docker compose exec rooms_service alembic upgrade head
-docker compose exec requests_service alembic upgrade head
-```
 
----
+# Логи сервиса
+docker compose logs -f rooms_service
 
-## 📊 Мониторинг (Prometheus + Grafana + Loki)
-
-После `docker compose up --build` доступны:
-
-| Сервис | URL | Назначение |
-|--------|-----|------------|
-| **Grafana** | http://localhost:3003 | Дашборд «CMAS — метрики и логи» |
-| **Prometheus** | http://localhost:9090 | Сбор метрик `/metrics` |
-| **Loki** | http://localhost:3100 | Хранилище логов |
-
-Логин Grafana по умолчанию: `admin` / `admin` (переменные `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD` в `.env`).
-
-### Метрики
-
-Все FastAPI-сервисы отдают Prometheus-метрики (`prometheus-fastapi-instrumentator`): RPS, latency, статусы HTTP, in-progress.
-
-### Логи и correlation_id
-
-Каждый запрос получает заголовок **`X-Correlation-ID`** (клиент может передать свой; иначе генерируется UUID).  
-Логи в stdout — **JSON** с полями `correlation_id`, `service`, `method`, `path`, `status_code`.  
-Gateway пробрасывает тот же ID в микросервисы при проксировании.
-
-На дашборде Grafana:
-- фильтр **service** — gateway / users / rooms / requests;
-- поле **correlation_id** — regex (вставьте UUID из ответа API, чтобы увидеть цепочку запросов).
-
-Пример:
-
-```bash
-curl -i http://localhost:8000/health
-# смотрите заголовок X-Correlation-ID в ответе
+# Пересборка одного сервиса
+docker compose up --build rooms_service
 ```
