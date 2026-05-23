@@ -108,6 +108,7 @@ async def _forward_request(
     method: str,
     base_url: str,
     path: str,
+    
     *,
     json: dict[str, Any] | None = None,
     params: dict[str, Any] | None = None,
