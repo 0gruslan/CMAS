@@ -37,6 +37,10 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Correlation-ID"],
 )
+
+
+
+
 app.add_middleware(CorrelationIdMiddleware, service_name="gateway")
 
 Instrumentator().instrument(app).expose(app)
