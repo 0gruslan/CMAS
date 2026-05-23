@@ -169,3 +169,38 @@ docker compose exec users_service alembic upgrade head
 docker compose exec rooms_service alembic upgrade head
 docker compose exec requests_service alembic upgrade head
 ```
+
+---
+
+## 📊 Мониторинг (Prometheus + Grafana + Loki)
+
+После `docker compose up --build` доступны:
+
+| Сервис | URL | Назначение |
+|--------|-----|------------|
+| **Grafana** | http://localhost:3003 | Дашборд «CMAS — метрики и логи» |
+| **Prometheus** | http://localhost:9090 | Сбор метрик `/metrics` |
+| **Loki** | http://localhost:3100 | Хранилище логов |
+
+Логин Grafana по умолчанию: `admin` / `admin` (переменные `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD` в `.env`).
+
+### Метрики
+
+Все FastAPI-сервисы отдают Prometheus-метрики (`prometheus-fastapi-instrumentator`): RPS, latency, статусы HTTP, in-progress.
+
+### Логи и correlation_id
+
+Каждый запрос получает заголовок **`X-Correlation-ID`** (клиент может передать свой; иначе генерируется UUID).  
+Логи в stdout — **JSON** с полями `correlation_id`, `service`, `method`, `path`, `status_code`.  
+Gateway пробрасывает тот же ID в микросервисы при проксировании.
+
+На дашборде Grafana:
+- фильтр **service** — gateway / users / rooms / requests;
+- поле **correlation_id** — regex (вставьте UUID из ответа API, чтобы увидеть цепочку запросов).
+
+Пример:
+
+```bash
+curl -i http://localhost:8000/health
+# смотрите заголовок X-Correlation-ID в ответе
+```

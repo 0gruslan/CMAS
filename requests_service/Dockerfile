@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копирование кода приложения
+COPY shared/cmas_shared ./cmas_shared
 COPY requests_service/ .
 
 # Открыть порт

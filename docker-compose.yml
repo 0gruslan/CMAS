@@ -70,6 +70,7 @@ services:
         condition: service_healthy
     volumes:
       - ./users_service:/app
+      - ./shared/cmas_shared:/app/cmas_shared:ro
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload"
 
   # Rooms Service
@@ -87,6 +88,7 @@ services:
         condition: service_healthy
     volumes:
       - ./rooms_service:/app
+      - ./shared/cmas_shared:/app/cmas_shared:ro
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload"
 
   # Requests Service
@@ -104,6 +106,7 @@ services:
         condition: service_healthy
     volumes:
       - ./requests_service:/app
+      - ./shared/cmas_shared:/app/cmas_shared:ro
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload"
 
   # Frontend
@@ -112,6 +115,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: cmas_frontend
+    env_file:
+      - .env
     ports:
       - "3000:80"
     depends_on:
@@ -133,9 +138,74 @@ services:
       - requests_service
     volumes:
       - ./gateway:/app
+      - ./shared/cmas_shared:/app/cmas_shared:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: cmas_prometheus
+    restart: unless-stopped
+    depends_on:
+      - gateway
+      - users_service
+      - rooms_service
+      - requests_service
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: cmas_loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/loki-config.yml
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: cmas_promtail
+    restart: unless-stopped
+    depends_on:
+      - loki
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+
+  grafana:
+    image: grafana/grafana:11.1.4
+    container_name: cmas_grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - loki
+    ports:
+      - "${GRAFANA_PORT:-3003}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_UID: cmas-overview
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+
 
 volumes:
   users_db_data:
   rooms_db_data:
   requests_db_data:
+  grafana_data:
+  prometheus_data:
+  loki_data:
+  

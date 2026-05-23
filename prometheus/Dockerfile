@@ -9,7 +9,7 @@ RUN wget -qO /tmp/prometheus.tar.gz \
     mv /tmp/prometheus-2.51.0.linux-amd64/promtool /usr/local/bin/ && \
     rm -rf /tmp/prometheus*
 
-COPY prometheus/prometheus.yml /etc/prometheus/prometheus.yml.template
+COPY prometheus.yml /etc/prometheus/prometheus.yml.template
 
 EXPOSE 9090
 

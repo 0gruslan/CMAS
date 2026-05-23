@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: CMAS
+    orgId: 1
+    folder: CMAS
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

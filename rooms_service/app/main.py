@@ -10,8 +10,12 @@ from sqlalchemy.orm import Session
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from cmas_shared.observability import CorrelationIdMiddleware, configure_logging
+
 from .database import get_db
 from .models import FloorORM, ResidenceORM, RoomORM
+
+configure_logging("rooms_service")
 
 app = FastAPI(
     title="Rooms Service",
@@ -25,7 +29,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Correlation-ID"],
 )
+app.add_middleware(CorrelationIdMiddleware, service_name="rooms_service")
 
 Instrumentator().instrument(app).expose(app)
 

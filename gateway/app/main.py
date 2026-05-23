@@ -14,6 +14,15 @@ from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from cmas_shared.observability import (
+    CORRELATION_HEADER,
+    CorrelationIdMiddleware,
+    configure_logging,
+    get_correlation_id,
+)
+
+configure_logging("gateway")
+
 app = FastAPI(
     title="API Gateway",
     description="Единая точка входа для всех микросервисов",
@@ -26,7 +35,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Correlation-ID"],
 )
+app.add_middleware(CorrelationIdMiddleware, service_name="gateway")
 
 Instrumentator().instrument(app).expose(app)
 
@@ -100,6 +111,10 @@ async def _forward_request(
 ) -> Any:
     url = f"{base_url}{path}"
     json_payload = jsonable_encoder(json) if json is not None else None
+    forward_headers = dict(headers or {})
+    correlation_id = get_correlation_id()
+    if correlation_id and correlation_id != "-":
+        forward_headers[CORRELATION_HEADER] = correlation_id
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.request(
@@ -107,7 +122,7 @@ async def _forward_request(
                 url=url,
                 json=json_payload,
                 params=params,
-                headers=headers,
+                headers=forward_headers,
             )
     except httpx.RequestError as exc:
         raise HTTPException(
